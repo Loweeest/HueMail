@@ -188,7 +188,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         body {
             font-family: 'Arial', sans-serif;
-            background: url('images/huemail.jpg') no-repeat center center fixed;
+            background: url('images/mainbg.jpg') no-repeat center center fixed;
             background-size: cover;
             color: #333;
             display: flex;

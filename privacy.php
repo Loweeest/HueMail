@@ -58,7 +58,7 @@ if (!$pin_row) {
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: url('images/huemail.jpg') no-repeat center center fixed;
+            background: url('images/mainbg.jpg') no-repeat center center fixed;
             background-size: cover;
             margin: 0;
             display: flex;
