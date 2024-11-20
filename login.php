@@ -314,13 +314,6 @@ $page = 'login'; // Set the current page identifier
     background-color: #45a049; /* Darker green on hover */
 }
 
-.gradient-label {
-            font-size: 16px; /* Adjust font size as needed */
-            font-weight: bold; /* Optional: Make the text bold */
-            background: linear-gradient(90deg, #ff5757, #5e17eb); /* Gradient colors */
-            -webkit-background-clip: text; /* Clip gradient to the text */
-            -webkit-text-fill-color: transparent; /* Make text transparent to show gradient */
-        }
     </style>
 <script>
 // Function to toggle password visibility
@@ -401,11 +394,11 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="error-message"><?php echo htmlspecialchars($error_message); ?></div>
         <?php endif; ?>
         <form action="login.php" method="POST">
-            <label for="email" class="gradient-label">Email:</label>
+            <label for="email">Email:</label>
             <input type="email" id="email" name="email" value="<?php echo htmlspecialchars($email); ?>" required>
 
             <div class="password-wrapper">
-    <label for="password" class="gradient-label">Password:</label>
+    <label for="password">Password:</label>
     <input type="password" id="password" name="password" required oninput="handlePasswordInput(event)">
     <i class="fa fa-eye-slash eye-icon" onclick="togglePasswordVisibility(event)"></i>
     <div id="caps-lock-message" class="caps-lock-message">
