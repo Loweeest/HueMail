@@ -472,7 +472,7 @@ a:hover .folder-count {
 
 <div class="main-content">
 <div class="navbar">
-<i class="fas fa-arrow-left" id="toggle-icon" style="font-size: 1.5em; cursor: pointer; margin-right: 1em;"></i>
+<i class="fas fa-arrow-left" id="toggle-icon" style="font-size: 1.5em; cursor: pointer; margin-right: 1em; color: white"></i>
         <div class="search-container">
             <input type="text" placeholder="Search emails..." id="search-bar">
             <i class="fas fa-search"></i>
