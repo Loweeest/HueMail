@@ -107,13 +107,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     header("Location: compose.php?id=$email_id");
     exit;
 }
+
+$stmt = $pdo->prepare("SELECT background_image FROM users WHERE id = :id");
+$stmt->execute([':id' => $_SESSION['user_id']]);
+$user_bg = $stmt->fetch(PDO::FETCH_ASSOC);
+
+// Default background image path
+$default_background = 'images/mainbg.jpg'; // Default image if none is set
+$current_background = $user_bg['background_image'] ?: $default_background; // Use user image or default
+
+// Cache busting: Add a timestamp to the image URL to avoid caching
+$background_image_url = $current_background . '?v=' . time();
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
+<meta charset="UTF-8">
+    <link rel="icon" href="images/favicon.ico" type="image/x-icon"> <!-- Adjust path if necessary -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="bootstrap-5.3.3-dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="fontawesome-free-6.6.0-web/css/all.min.css">
+    <script src="bootstrap-5.3.3-dist/js/bootstrap.bundle.min.js"></script>
+
+    <body style="background: url('<?php echo $background_image_url; ?>') no-repeat center center fixed; background-size: cover;">
+
     <title>Edit Draft - HueMail</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
@@ -135,16 +153,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         .email-container {
-            max-width: 900px;
-            width: 70%;
-            background: #fff;
-            padding: 30px;
+            position: relative;
+            background: rgba(255, 255, 255, 0.9);
             border-radius: 10px;
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            padding: 20px;
+            width: 100%;
+            max-width: 800px;
+            box-sizing: border-box;
             overflow: hidden;
-            border: 5px solid black;
-            margin-top: 50px;
+            border: 5px solid white;
+            border-radius: 5px;
+            margin: auto; /* Center the container */
+    position: relative;
+    margin-top: auto;
+    overflow: hidden;
         }
+
 
         .email-header {
             display: flex;
@@ -189,6 +214,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .email-details label {
             font-weight: bold;
             color: #333;
+            
         }
 
         .email-details input[type="email"], 
@@ -199,13 +225,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             margin-top: 8px;
             margin-bottom: 20px;
             border-radius: 5px;
-            border: 1px solid #ddd;
+            border: 2px solid #ddd;
             font-size: 16px;
             color: #333;
         }
 
         .email-details textarea {
-            height: 200px;
+            height: 150px;
             resize: none;
         }
 
@@ -271,32 +297,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <a href="draft.php" class="back-button"><i class="fas fa-arrow-left"></i> Back to Drafts</a>
     </div>
 
-    <form method="POST" action="" enctype="multipart/form-data">
+    <form action="" method="POST" enctype="multipart/form-data">
         <div class="email-details">
             <label for="recipient">To:</label>
-            <input type="email" name="recipient" id="recipient" value="<?= htmlspecialchars($email['recipient']) ?>" required>
-
-            <label for="subject">Subject:</label>
-            <input type="text" name="subject" id="subject" value="<?= htmlspecialchars($email['subject']) ?>" required>
-
-            <label for="body">Message:</label>
-            <textarea name="body" id="body" required><?= htmlspecialchars($email['body']) ?></textarea>
+            <input type="email" id="recipient" name="recipient" value="<?= htmlspecialchars($email['recipient']) ?>" required readonly>
         </div>
 
+        <div class="email-details">
+    <label for="subject">Subject:</label>
+    <input type="text" id="subject" name="subject" value="<?= htmlspecialchars($email['subject']) ?>" required readonly>
+</div>
+
+
+        <div class="email-details">
+    <label for="body">Body:</label>
+    <textarea id="body" name="body" required style="text-align: left; padding-left: auto;" readonly><?= htmlspecialchars($email['body']) ?></textarea> 
+</div>
+
+
+
         <div class="attachments">
-            <strong>Attachments:</strong>
-            <ul>
-                <?php foreach ($attachments as $attachment): ?>
-                    <li><a href="<?= htmlspecialchars($attachment) ?>" target="_blank"><?= basename($attachment) ?></a></li>
-                <?php endforeach; ?>
-            </ul>
-            <label for="attachment">Add new attachment:</label>
-            <input type="file" name="attachment[]" id="attachment" multiple>
+            <label>Attachments:</label>
+            <?php if ($attachments): ?>
+                <ul>
+                    <?php foreach ($attachments as $attachment): ?>
+                        <li><a href="<?= htmlspecialchars($attachment) ?>" target="_blank"><?= basename($attachment) ?></a></li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php else: ?>
+                <p>No attachments.</p>
+            <?php endif; ?>
         </div>
 
         <div class="button-container">
-            <button type="submit" class="save-button">Save Draft</button>
+
+        <a href="move_to_trash.php?id=<?= $email_id ?>" class="delete-button" onclick="return confirm('Are you sure you want to move this email to trash?');">
+                <i class="fas fa-trash"></i> Move to Trash
+            </a>
             <a href="compose.php?id=<?= $email_id ?>" class="continue-button">Continue Composing</a>
+            <!-- Move to Trash button -->
+
         </div>
     </form>
 </div>

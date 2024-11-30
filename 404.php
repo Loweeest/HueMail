@@ -5,6 +5,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <link rel="icon" href="images/favicon.ico" type="image/x-icon"> <!-- Adjust path if necessary -->
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <!-- Link to Bootstrap CSS (locally) -->
         <link rel="stylesheet" href="bootstrap-5.3.3-dist/css/bootstrap.min.css">

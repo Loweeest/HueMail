@@ -41,7 +41,6 @@ $stmt->execute([$user_id]);
 $user = $stmt->fetch();
 
 if (!$user || !$user['account_updated']) {
-    $_SESSION['error_message'] = "Please update your account settings before sending an email.";
     header('Location: account_settings.php');
     exit;
 }
@@ -100,10 +99,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Ensure valid recipient
     if (!filter_var($recipient, FILTER_VALIDATE_EMAIL)) {
-        echo json_encode(['success' => false, 'error_message' => 'Invalid recipient email address.']);
+        echo json_encode(['success' => false, 'error-message' => 'Invalid recipient email address.']);
         exit;
     } elseif (empty($validCC) && empty($validBCC) && empty($recipient)) {
-        echo json_encode(['success' => false, 'error_message' => 'You must provide at least one recipient, CC, or BCC.']);
+        echo json_encode(['success' => false, 'error-message' => 'You must provide at least one recipient, CC, or BCC.']);
         exit;
     }
 
@@ -157,11 +156,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ');
             $stmt->execute([$_SESSION['email'], $recipient, $ccString, $bccString, $subject, $body, $_SESSION['user_id'], $status, $attachments]);
+
+            if ($status === 'sent') {
+                // Find the recipient's user_id
+                $recipientStmt = $pdo->prepare('SELECT id FROM users WHERE email = ?');
+                $recipientStmt->execute([$recipient]);
+                $recipientUser = $recipientStmt->fetch(PDO::FETCH_ASSOC);
+
+                if ($recipientUser) {
+                    $recipientId = $recipientUser['id'];
+                    $receivedAt = date('Y-m-d H:i:s'); // Timestamp when the email was received
+                    $status = 'unread'; // Set the initial status as unread
+
+                    // Insert the email into the inbox_emails table for the recipient
+                    $stmt = $pdo->prepare('
+                        INSERT INTO inbox_emails (sender, recipient, cc, bcc, subject, body, user_id, status, attachment)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ');
+                    $stmt->execute([$_SESSION['email'], $recipient, $ccString, $bccString, $subject, $body, $recipientId, $status, $attachments]);
+
+                    // Insert into the sender's inbox as well
+                    $stmt = $pdo->prepare('
+                        INSERT INTO inbox_emails (sender, recipient, cc, bcc, subject, body, user_id, status, attachment)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ');
+                    $stmt->execute([$_SESSION['email'], $recipient, $ccString, $bccString, $subject, $body, $_SESSION['user_id'], 'sent', $attachments]);
+                }
+            }
         }
 
         // Redirect or show success message
-        $_SESSION['success_message'] = $email_id > 0 ? "Draft updated successfully!" : "Message saved or sent successfully!";
-        header('Location: inbox.php');
+        $_SESSION['success_message'] = $email_id > 0 ? "Message successfully sent." : "Message successfully sent.";
+        header('Location: compose.php');
         exit;
     } catch (PDOException $e) {
         $_SESSION['error_message'] = "Database error: " . $e->getMessage();
@@ -169,7 +195,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 }
+
+// Fetch user's background image from the 'users' table
+$stmt = $pdo->prepare("SELECT background_image FROM users WHERE id = :id");
+$stmt->execute([':id' => $user_id]);
+$user_bg = $stmt->fetch(PDO::FETCH_ASSOC);
+
+// Default background image path
+$default_background = 'images/mainbg.jpg'; // Default image if none is set
+$current_background = $user_bg['background_image'] ?: $default_background; // Use user image or default
+
+// Cache busting: Add a timestamp to the image URL to avoid caching
+$background_image_url = $current_background . '?v=' . time();
 ?>
+
 
 <!DOCTYPE html>
 <html lang="en">
@@ -177,9 +216,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Compose - HueMail</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <style>
-        /* Global Styles */
+
+    <link rel="icon" href="images/favicon.ico" type="image/x-icon"> <!-- Adjust path if necessary -->
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Link to Bootstrap CSS (locally) -->
+    <link rel="stylesheet" href="bootstrap-5.3.3-dist/css/bootstrap.min.css">
+    
+    <!-- Link to Font Awesome CSS (locally) -->
+    <link rel="stylesheet" href="fontawesome-free-6.6.0-web/css/all.min.css">
+
+     <!-- Link to Bootstrap JS (locally) -->
+     <script src="bootstrap-5.3.3-dist/js/bootstrap.bundle.min.js"></script>
+
+    <body style="background: url('<?php echo $background_image_url; ?>') no-repeat center center fixed; background-size: cover;">
+
+    
+        <style>
         * {
             margin: 0;
             padding: 0;
@@ -207,6 +260,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             max-width: 800px;
             box-sizing: border-box;
             overflow: hidden;
+            border: 5px solid white;
+            border-radius: 5px;
+            margin: auto; /* Center the container */
+    position: relative;
+    margin-top: auto;
+    overflow: hidden;
         }
 
         .close-btn {
@@ -245,25 +304,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         /* Error Message */
         .error-message {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-            border-radius: 5px;
-            padding: 15px;
-            margin-bottom: 20px;
-            display: none; /* Hide by default */
-        }
+    background-color: #f8d7da;
+    color: #721c24;
+    padding: 10px;
+    margin-bottom: 20px;
+    border: 1px solid #f5c6cb;
+    border-radius: 5px;
+    font-weight: bold;
+    text-align: center;
+
+}
 
         .success-message {
             background-color: #d4edda;
             color: #155724;
             padding: 10px;
+            margin-bottom: 20px;
             border: 1px solid #c3e6cb;
             border-radius: 5px;
             margin: 20px 0;
             text-align: center;
         }
-
         /* Form Styles */
         form {
             display: flex;
@@ -367,6 +428,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 <body>
 <div class="container">
+
+<?php
+    // Display success message if set
+    if (isset($_SESSION['success_message'])) {
+        echo '<div class="success-message">' . $_SESSION['success_message'] . '</div>';
+        unset($_SESSION['success_message']);  // Clear the message after displaying it
+    }
+    ?>
+    
+<?php if (isset($_SESSION['error_message'])): ?>
+    <div class="error-message">
+        <?php echo $_SESSION['error_message']; unset($_SESSION['error_message']); ?>
+    </div>
+<?php endif; ?>
+
+            <!-- Error Message -->
+            <div id="error-message" class="error-message" style="display:none;"></div>
+
         <button class="close-btn" onclick="window.location.href='inbox.php';">&times;</button>
         <h1>Compose Email</h1>
         <form id="composeForm" method="POST" enctype="multipart/form-data">
@@ -402,12 +481,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             <!-- Save Draft or Send -->
             <div>
-                <button type="submit" name="save_draft" value="1">Save Draft</button>
                 <button type="submit">Send Email</button>
             </div>
-
-            <!-- Error Message -->
-            <div id="error-message" class="error-message" style="display:none;"></div>
 
             <!-- Hidden Body Field -->
             <textarea id="body" name="body" style="display:none;"></textarea>
@@ -460,116 +535,173 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-    let form = document.getElementById('composeForm');
-    let recipientInput = document.getElementById('recipient');
-    let subjectInput = document.getElementById('subject');
-    let editor = document.getElementById('editor');
+document.addEventListener('DOMContentLoaded', function () {
+    const form = document.getElementById('composeForm');
+    const recipientInput = document.getElementById('recipient');
+    const subjectInput = document.getElementById('subject');
+    const editor = document.getElementById('editor');
+    let isDraftSaved = false;
 
-    // Check if there's saved draft in localStorage
-    if (localStorage.getItem('draft')) {
-        const draft = JSON.parse(localStorage.getItem('draft'));
-        recipientInput.value = draft.recipient || '';
-        subjectInput.value = draft.subject || '';
-        editor.innerHTML = draft.body || '';
-    }
+    // Listen for the 'beforeunload' event to save the draft before the page is unloaded
+    window.addEventListener('beforeunload', function (event) {
+        // Only save the draft if it hasn't already been saved
+        if (!isDraftSaved) {
+            // Prevent the default action (e.g., page navigation)
+            saveDraftToServer();
+        }
+    });
 
-    // Save the draft automatically as the user types
-    form.addEventListener('input', function() {
+    // Function to save the draft to the server
+    function saveDraftToServer() {
         const draft = {
             recipient: recipientInput.value,
             subject: subjectInput.value,
             body: editor.innerHTML,
+            save_draft: true, // Flag to indicate that this is a draft save
+            csrf_token: '<?php echo $csrf_token; ?>' // CSRF token for security
         };
-        localStorage.setItem('draft', JSON.stringify(draft));
-    });
 
-    // Listen for the beforeunload event
-    let isDraftSaved = false;
-    window.addEventListener('beforeunload', function(event) {
-        if (!isDraftSaved) {
-            // If there's any unsaved draft, submit it
-            form.querySelector('[name="save_draft"]').value = '1'; // Set the flag to save as draft
-            form.submit();
-        }
-    });
-
-    // Mark as saved once the form is submitted
-    form.addEventListener('submit', function() {
-        isDraftSaved = true;
-        localStorage.removeItem('draft'); // Clear saved draft after submit
-    });
-});
-</script>
-
-<script>
-        document.getElementById("composeForm").addEventListener("submit", function(event) {
-    let attachments = document.getElementById("attachment").files;
-    if (attachments.length > 0) {
-        for (let i = 0; i < attachments.length; i++) {
-            let file = attachments[i];
-            if (file.size > 25 * 1024 * 1024) {
-                event.preventDefault();
-                alert("The file size exceeds the 25MB limit.");
-                return;
+        // Send the draft data to the server (via Fetch API)
+        fetch('draft.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded', // Form data encoding
+            },
+            body: new URLSearchParams(draft).toString() // Convert the draft object to URL-encoded format
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Mark as saved to prevent redundant saves
+                isDraftSaved = true;
             }
-            if (["exe", "bat"].includes(file.name.split('.').pop().toLowerCase())) {
-                event.preventDefault();
-                alert("Executable files are not allowed.");
-                return;
-            }
-        }
+        })
+        .catch(error => console.error('Error saving draft:', error));
     }
+
+    // Clear the draft if the user manually submits the form
+    form.addEventListener('submit', function () {
+        isDraftSaved = true; // Mark as saved
+    });
 });
+
 </script>
 
-<!--
+
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Get user_id and sender_email from PHP session
-        const userId = <?php echo json_encode($_SESSION['user_id']); ?>;
-        const senderEmail = <?php echo json_encode($_SESSION['email']); ?>;
+    document.getElementById("composeForm").addEventListener("submit", function(event) {
+        let attachments = document.getElementById("attachment").files;
+        let errorMessageDiv = document.querySelector(".error-message"); // The div where error messages are displayed
+        if (errorMessageDiv) {
+            errorMessageDiv.style.display = "none"; // Hide the previous error message
+        }
 
-        const ws = new WebSocket('ws://localhost:8081/email'); 
+        // Clear any previous session-based error message
+        <?php unset($_SESSION['error_message']); ?>
 
-        ws.onopen = function() {
-            console.log("Connected to WebSocket server.");
-        };
-
-        ws.onerror = function(error) {
-            console.log("WebSocket Error: ", error);
-        };
-
-        document.getElementById('composeForm').addEventListener('submit', function(event) {
-            event.preventDefault(); // Prevent form submission
-
-            // Ensure required fields are sent in the WebSocket message
-            const message = {
-                type: 'new_email',
-                user_id: userId,  // Injected from PHP session
-                sender_email: senderEmail,  // Injected from PHP session
-                recipient: document.getElementById('recipient').value,
-                subject: document.getElementById('subject').value,
-                body: document.getElementById('editor').innerHTML,  // Assuming the body is in the 'editor' div
-                message: {
-                    id: Math.floor(Math.random() * 1000),  // Generate a random ID for the email
-                    sender_email: senderEmail,  // Sender email (same as above)
-                    subject: document.getElementById('subject').value,
-                    created_at: new Date().toISOString()  // Current timestamp in ISO format
+        if (attachments.length > 0) {
+            for (let i = 0; i < attachments.length; i++) {
+                let file = attachments[i];
+                
+                // Check for file size limit
+                if (file.size > 25 * 1024 * 1024) {
+                    event.preventDefault();
+                    // Show error message without alert
+                    errorMessageDiv.innerHTML = "The file size exceeds the 25MB limit.";
+                    errorMessageDiv.style.display = "block";
+                    return;
                 }
-            };
 
-            // Send the message to the WebSocket server
-            ws.send(JSON.stringify(message)); 
-
-            // Optionally, submit the form after sending WebSocket message (if needed)
-            this.submit();
-        });
-
+                // Check for forbidden file types (exe, bat)
+                if (["exe", "bat"].includes(file.name.split('.').pop().toLowerCase())) {
+                    event.preventDefault();
+                    // Show error message without alert
+                    errorMessageDiv.innerHTML = "Executable files are not allowed.";
+                    errorMessageDiv.style.display = "block";
+                    return;
+                }
+            }
+        }
     });
 </script>
 
--->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Get user_id and sender_email from PHP session
+    const userId = <?php echo json_encode($_SESSION['user_id']); ?>;
+    const senderEmail = <?php echo json_encode($_SESSION['email']); ?>;
+
+    // Create a WebSocket connection
+    const ws = new WebSocket('ws://localhost:8081/email'); 
+
+    // WebSocket open event: Log when the connection is successful
+    ws.onopen = function() {
+        console.log("Connected to WebSocket server.");
+    };
+
+    // WebSocket error event: Log any connection errors
+    ws.onerror = function(error) {
+        console.error("WebSocket error:", error);
+    };
+
+    // When the form is submitted to send an email
+    document.getElementById('composeForm').addEventListener('submit', function(event) {
+        event.preventDefault(); // Prevent form submission (avoids page reload)
+
+        // Get the email data from the form
+        const recipient = document.getElementById('recipient').value;
+        const subject = document.getElementById('subject').value;
+        const body = document.getElementById('editor').innerHTML; // Get the body from the editor
+
+        // Check if the WebSocket is open before proceeding
+        if (ws.readyState === WebSocket.OPEN) {
+
+            // Fetch the next email ID from the backend
+            fetch('getEmailId.php')  // Fetching the email ID from the server-side
+                .then(response => response.json())  // Parsing the JSON response
+                .then(data => {
+                    if (data.email_id) {  // If a valid email ID is returned
+                        const emailId = data.email_id;
+
+                        // Prepare the message object for WebSocket
+                        const message = {
+                            type: 'new_email',
+                            user_id: userId,  // Sender user ID (from PHP session)
+                            sender_email: senderEmail,  // Sender email (from PHP session)
+                            recipient: recipient,  // Recipient from form input
+                            subject: subject,  // Subject from form input
+                            body: body,  // Body of the email
+                            message: {
+                                id: emailId,  // Use the ID fetched from the backend
+                                sender_email: senderEmail,  // Sender email
+                                subject: subject,  // Subject of the email
+                                created_at: new Date().toISOString()  // Current timestamp
+                            }
+                        };
+
+                        // Send the message to the WebSocket server
+                        ws.send(JSON.stringify(message));
+
+                        // Optionally, submit the form after the WebSocket message has been sent
+                        // This can be uncommented if you want to submit the form as well
+                        this.submit();  // Submit the form (if necessary)
+
+                    } else {
+                        console.error('Error: Could not retrieve email ID');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching email ID:', error);
+                });
+
+        } else {
+            console.error('Error: WebSocket is not open.');
+        }
+    });
+});
+
+</script>
+
 
 
 </body>

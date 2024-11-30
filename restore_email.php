@@ -59,11 +59,51 @@ $stmt->execute([
     ':status' => 'sent'  // Ensure the email has 'sent' status when restored
 ]);
 
-echo "Email restored to 'emails' table.<br>";
+// Check if the email was originally sent or archived
+if ($email['status'] == 'sent') {
+    // Restore the email by inserting it back into the emails table with 'sent' status
+    $stmt = $pdo->prepare('
+        INSERT INTO emails (sender, recipient, subject, body, created_at, user_id, status)
+        VALUES (:sender, :recipient, :subject, :body, :created_at, :user_id, :status)
+    ');
+    $stmt->execute([
+        ':sender' => $email['sender'],
+        ':recipient' => $email['recipient'],
+        ':subject' => $email['subject'],
+        ':body' => $email['body'],
+        ':created_at' => $email['created_at'],
+        ':user_id' => $_SESSION['user_id'],
+        ':status' => 'sent'  // Restore as 'sent'
+    ]);
+    echo "Email restored as 'sent'.<br>";
+
+} else if ($email['status'] == 'archive') {
+    // Restore the email by inserting it back into the emails table with 'archive' status
+    $stmt = $pdo->prepare('
+        INSERT INTO emails (sender, recipient, subject, body, created_at, user_id, status)
+        VALUES (:sender, :recipient, :subject, :body, :created_at, :user_id, :status)
+    ');
+    $stmt->execute([
+        ':sender' => $email['sender'],
+        ':recipient' => $email['recipient'],
+        ':subject' => $email['subject'],
+        ':body' => $email['body'],
+        ':created_at' => $email['created_at'],
+        ':user_id' => $_SESSION['user_id'],
+        ':status' => 'archive'  // Restore as 'archive'
+    ]);
+    echo "Email restored as 'archive'.<br>";
+
+} else {
+    echo "Email status not recognized.<br>";
+}
+
 
 // Now, delete it from the deleted_emails table (permanently removing it from trash)
 $stmt = $pdo->prepare('DELETE FROM deleted_emails WHERE id = :id AND user_id = :user_id');
 $stmt->execute([':id' => $email_id, ':user_id' => $_SESSION['user_id']]);
+
+
 
 echo "Email deleted from trash.<br>";
 

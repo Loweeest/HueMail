@@ -141,17 +141,42 @@ if (isset($_POST['delete_profile'])) {
     }
 }
 
+// Fetch user's background image from the 'users' table
+$stmt = $pdo->prepare("SELECT background_image FROM users WHERE id = :id");
+$stmt->execute([':id' => $user_id]);
+$user_bg = $stmt->fetch(PDO::FETCH_ASSOC);
+
+// Default background image path
+$default_background = 'images/mainbg.jpg'; // Default image if none is set
+$current_background = $user_bg['background_image'] ?: $default_background; // Use user image or default
+
+// Cache busting: Add a timestamp to the image URL to avoid caching
+$background_image_url = $current_background . '?v=' . time();
 ?>
 
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
+<meta charset="UTF-8">
+    <link rel="icon" href="images/favicon.ico" type="image/x-icon"> <!-- Adjust path if necessary -->
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Link to Bootstrap CSS (locally) -->
+    <link rel="stylesheet" href="bootstrap-5.3.3-dist/css/bootstrap.min.css">
+    
+    <!-- Link to Font Awesome CSS (locally) -->
+    <link rel="stylesheet" href="fontawesome-free-6.6.0-web/css/all.min.css">
+
+ <!-- Link to Bootstrap JS (locally) -->
+    <script src="bootstrap-5.3.3-dist/js/bootstrap.bundle.min.js"></script>
+
+    <body style="background: url('<?php echo $background_image_url; ?>') no-repeat center center fixed; background-size: cover;">
+
     <title>Add Profile Picture - HueMail</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.css">
-    <style>
+
+<style>
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: url('images/mainbg.jpg') no-repeat center center fixed;
@@ -301,12 +326,12 @@ if (isset($_POST['delete_profile'])) {
         .submit-button {
             display: block;
             margin: 0 auto; /* Centers the button */
-            width: 20%; /* Adjust width as needed */
+            width: 35%; /* Adjust width as needed */
         }
         .remove-profile-btn {
     background-color: #ff4d4d;
-    width: 30%;
-    margin-top: 20px;
+    width: 40%;
+    margin-top: 10px;
     padding: 12px;
     color: #fff;
     border: none;
@@ -345,7 +370,7 @@ if (isset($_POST['delete_profile'])) {
             <button type="submit" name="delete_profile" class="remove-profile-btn">Remove Profile Picture</button>
             </form>
         </center>
-
+<br>
     <div class="form-row">
         <div class="form-column">
             <p>Need to change your password? <a href="change_password.php">Click here.</a></p>

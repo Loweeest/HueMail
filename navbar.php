@@ -6,6 +6,8 @@ $page = isset($page) ? $page : ''; // Ensure $page is set or default to empty
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <link rel="icon" href="images/favicon.ico" type="image/x-icon"> <!-- Adjust path if necessary -->
+
     <!-- Link to Bootstrap CSS (locally) -->
     <link rel="stylesheet" href="bootstrap-5.3.3-dist/css/bootstrap.min.css">
     
@@ -157,8 +159,7 @@ $page = isset($page) ? $page : ''; // Ensure $page is set or default to empty
 <body>
     <div class="navbar">
         <div class="nav-links">
-        <a href="home.php" class="<?php echo $page == 'home' ? 'current' : ''; ?>">
-    <img src="images/textlogo.png" alt="Home"></a>
+            <a href="home.php" class="<?php echo $page == 'home' ? 'current' : ''; ?>">Home</a>
         </div>
         <div class="auth-links">
     <a href="login.php" class="<?php echo $page == 'login' ? 'current' : ''; ?>">Log In</a>

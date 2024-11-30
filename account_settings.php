@@ -54,21 +54,20 @@ if (!$user) {
     die('User not found.');
 }
 
-// Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Sanitize input
-    $first_name = filter_var(trim($_POST['first_name']), FILTER_SANITIZE_STRING);
-    $middle_name = filter_var(trim($_POST['middle_name']), FILTER_SANITIZE_STRING);
-    $last_name = filter_var(trim($_POST['last_name']), FILTER_SANITIZE_STRING);
-    $gender = filter_var(trim($_POST['gender']), FILTER_SANITIZE_STRING);
-    $birthdate = filter_var(trim($_POST['birthdate']), FILTER_SANITIZE_STRING);
+    // Sanitize input manually (avoiding deprecated FILTER_SANITIZE_STRING)
+    $first_name = trim($_POST['first_name']);
+    $middle_name = trim($_POST['middle_name']);
+    $last_name = trim($_POST['last_name']);
+    $gender = trim($_POST['gender']);
+    $birthdate = trim($_POST['birthdate']);
     $email = filter_var(trim($_POST['email']), FILTER_SANITIZE_EMAIL);
 
     // Validation
     if (!preg_match("/^[a-zA-Z]+(?: [a-zA-Z]+)*$/", $first_name)) {
         $error_message = 'First name must contain only letters.';
     } elseif (!preg_match("/^[a-zA-Z]+(?: [a-zA-Z]+)*$/", $last_name)) {
-        $error_message = 'Last name must contain only letters..';
+        $error_message = 'Last name must contain only letters.';
     } elseif (!empty($middle_name) && !preg_match("/^[a-zA-Z]+(?: [a-zA-Z]+)*$/", $middle_name)) {
         $error_message = 'Middle name must contain only letters.';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -99,33 +98,67 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $error_message = 'Email address is already in use.';
             }
         }
-
-        // If no errors, update the profile
         if (!$error_message) {
             $pdo->beginTransaction();
-
             try {
+                // Update user details, including gender and profile picture
                 $stmt = $pdo->prepare('UPDATE users SET first_name = ?, middle_name = ?, last_name = ?, gender = ?, birthdate = ?, account_updated = TRUE WHERE id = ?');
                 $stmt->execute([$first_name, $middle_name, $last_name, $gender, $birthdate->format('Y-m-d'), $_SESSION['user_id']]);
+
+                // Determine profile picture based on gender
+                $profile_pic_path = 'images/pp.png'; // Default
+                if ($gender === 'Male') {
+                    $profile_pic_path = 'images/male.png';
+                } elseif ($gender === 'Female') {
+                    $profile_pic_path = 'images/female.png';
+                } elseif ($gender === 'Other') {
+                    $profile_pic_path = 'images/pp.png';
+                }
+
+                // Check and update profile picture if necessary
+                if ($user['profile_pic'] !== $profile_pic_path) {
+                    $stmt = $pdo->prepare('UPDATE users SET profile_pic = ? WHERE id = ?');
+                    $stmt->execute([$profile_pic_path, $_SESSION['user_id']]);
+
+                    // Optionally update 'register' table if needed
+                    $stmt = $pdo->prepare('UPDATE register SET profile_pic = ? WHERE id = ?');
+                    $stmt->execute([$profile_pic_path, $_SESSION['user_id']]);
+                }
 
                 // Update email if necessary
                 if ($user['email'] !== $email) {
                     $stmt = $pdo->prepare('UPDATE users SET email = ? WHERE id = ?');
                     $stmt->execute([$email, $_SESSION['user_id']]);
+
+                    $stmt = $pdo->prepare('UPDATE register SET email = ? WHERE id = ?');
+                    $stmt->execute([$email, $_SESSION['user_id']]);
                 }
 
+                // Commit transaction and redirect
                 $pdo->commit();
                 $_SESSION['success_message'] = 'Account settings updated successfully!';
-
                 header('Location: account_settings.php');
                 exit;
             } catch (Exception $e) {
                 $pdo->rollBack();
+                error_log('Error updating account settings: ' . $e->getMessage());
                 $error_message = 'Failed to update account settings. Please try again later.';
             }
         }
     }
 }
+
+// Fetch user's background image from the 'users' table
+$stmt = $pdo->prepare("SELECT background_image FROM users WHERE id = :id");
+$stmt->execute([':id' => $user_id]);
+$user_bg = $stmt->fetch(PDO::FETCH_ASSOC);
+
+// Default background image path
+$default_background = 'images/mainbg.jpg'; // Default image if none is set
+$current_background = $user_bg['background_image'] ?: $default_background; // Use user image or default
+
+// Cache busting: Add a timestamp to the image URL to avoid caching
+$background_image_url = $current_background . '?v=' . time();
 ?>
 
 
@@ -133,6 +166,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <link rel="icon" href="images/favicon.ico" type="image/x-icon"> <!-- Adjust path if necessary -->
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Account Settings</title>
     <!-- Link to Bootstrap CSS (locally) -->
@@ -143,6 +178,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
  <!-- Link to Bootstrap JS (locally) -->
     <script src="bootstrap-5.3.3-dist/js/bootstrap.bundle.min.js"></script>
+
+    <body style="background: url('<?php echo $background_image_url; ?>') no-repeat center center fixed; background-size: cover;">
+
         
     <style>
 body {
@@ -277,7 +315,7 @@ button:disabled {
 
 .error-message,
 .success-message {
-    font-size: 14px;
+    font-size: 18px;
     margin-bottom: 15px;
 }
 
@@ -286,8 +324,15 @@ button:disabled {
 }
 
 .success-message {
-    color: #28a745; /* Green */
-}
+    background-color: #d4edda;
+            color: #155724;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #c3e6cb;
+            border-radius: 5px;
+            margin: 20px 0;
+            text-align: center;
+}}
 
 @media (max-width: 768px) {
     .container {
@@ -430,7 +475,7 @@ function validateEmail() {
     const emailValue = emailInput.value.trim();
 
     // Email validation pattern for `@huemail.com` domain
-    const emailPattern = /^[a-zA-Z0-9._%+-]+@huemail\.com$/;
+    const emailPattern = /^[a-zA-Z0-9._%+-]+@huemail\.com$/i;
 
     if (!emailValue || !emailPattern.test(emailValue)) {
         emailError.style.display = 'block';
@@ -481,19 +526,19 @@ function handleFocus(event) {
     <div class="form-row">
         <div class="form-column">
             <label for="first_name">First Name</label>
-            <input type="text" id="first_name" name="first_name" value="<?php echo htmlspecialchars($user['first_name']); ?>" required oninput="validateFirstName()" onfocus="handleFocus(event)">
+            <input type="text" id="first_name" name="first_name" value="<?php echo htmlspecialchars($user['first_name']); ?>" required oninput="handleInput(event)" onfocus="handleFocus(event)">
             <div id="first-name-error" class="error-message" style="display: none;"></div>
         </div>
         <div class="form-column">
             <label for="middle_name">Middle Name</label>
-            <input type="text" id="middle_name" name="middle_name" value="<?php echo htmlspecialchars($user['middle_name']); ?>" oninput="validateMiddleName()" onfocus="handleFocus(event)">
+            <input type="text" id="middle_name" name="middle_name" value="<?php echo htmlspecialchars($user['middle_name']); ?>" oninput="handleInput(event)" onfocus="handleFocus(event)">
             <div id="middle-name-error" class="error-message" style="display: none;"></div>
         </div>
     </div>
     <div class="form-row">
         <div class="form-column">
             <label for="last_name">Last Name</label>
-            <input type="text" id="last_name" name="last_name" value="<?php echo htmlspecialchars($user['last_name']); ?>" required oninput="validateLastName()" onfocus="handleFocus(event)">
+            <input type="text" id="last_name" name="last_name" value="<?php echo htmlspecialchars($user['last_name']); ?>" required oninput="handleInput(event)" onfocus="handleFocus(event)">
             <div id="last-name-error" class="error-message" style="display: none;"></div>
         </div>
         <div class="form-column">
@@ -527,10 +572,35 @@ function handleFocus(event) {
 <div class="form-row">
         <div class="form-column">
             <p>Need to change your password? <a href="change_password.php">Click here.</a></p>
-            <p>Need to update your profile picture? <a href="add_profile.php">Click here.</a></p>
+            <p>Bored of the background? <a href="background_images.php">Change here.</a></p>
         </div>
     </div>
 </form>
+
+<script>
+// Function to capitalize the first letter of each word in the input
+function capitalizeFirstLetterOfEachWord(inputId) {
+    const inputField = document.getElementById(inputId);
+    let value = inputField.value;
+
+    // Split the input string into words, capitalize the first letter of each word
+    value = value.split(' ').map(word => {
+        if (word.length > 0) {
+            return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+        }
+        return word;
+    }).join(' ');
+
+    // Set the updated value back to the input field
+    inputField.value = value;
+}
+
+// Attach the capitalize function to the input fields
+function handleInput(event) {
+    capitalizeFirstLetterOfEachWord(event.target.id);
+}
+</script>
+
 
 </body>
 </html>

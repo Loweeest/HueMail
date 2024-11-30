@@ -102,6 +102,8 @@ $page = 'login'; // Set the current page identifier
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <link rel="icon" href="images/favicon.ico" type="image/x-icon"> <!-- Adjust path if necessary -->
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Log in to HueMail</title>
     <!-- Link to Bootstrap CSS (locally) -->
@@ -380,9 +382,8 @@ document.addEventListener('DOMContentLoaded', () => {
     <!-- Navbar -->
     <div class="navbar">
         <div class="nav-links">
-        <a href="home.php" class="<?php echo $page == 'home' ? 'current' : ''; ?>">
-    <img src="images/textlogo.png" alt="Home" width="200" height="50"></a>
-       </div>
+        <a href="home.php" class="<?php echo $page == 'home' ? 'current' : ''; ?>">Home</a>
+        </div>
         <div class="auth-links">
             <a href="login.php" class="<?php echo $page == 'login' ? 'current' : ''; ?>">Log In</a>
             <a href="register.php" class="signup-button <?php echo $page == 'signup' ? 'current' : ''; ?>">Sign Up</a>
@@ -390,6 +391,7 @@ document.addEventListener('DOMContentLoaded', () => {
     </div>
     <div class="container">
         <img src="images/logo.png"width="250" height="250">
+        <h1>Log in</h1>
         <?php if ($error_message): ?>
             <div class="error-message"><?php echo htmlspecialchars($error_message); ?></div>
         <?php endif; ?>

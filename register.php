@@ -108,8 +108,10 @@ $page = 'signup';
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <link rel="icon" href="images/favicon.ico" type="image/x-icon"> <!-- Adjust path if necessary -->
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign up for HueMail</title>
+    <title>Sign up</title>
     <!-- Link to Bootstrap CSS (locally) -->
     <link rel="stylesheet" href="bootstrap-5.3.3-dist/css/bootstrap.min.css">
     
@@ -434,8 +436,7 @@ $page = 'signup';
     <!-- Navbar -->
     <div class="navbar">
         <div class="nav-links">
-        <a href="home.php" class="<?php echo $page == 'home' ? 'current' : ''; ?>">
-        <img src="images/textlogo.png" alt="Home" width="200" height="50"></a>
+            <a href="home.php" class="<?php echo $page == 'home' ? 'current' : ''; ?>">Home</a>
         </div>
         <div class="auth-links">
             <a href="login.php" class="login-button <?php echo $page == 'login' ? 'current' : ''; ?>">Log In</a>

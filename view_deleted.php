@@ -57,13 +57,30 @@ function formatFileSize($size) {
 // Split the attachment string into an array if available
 $attachments = !empty($email['attachment']) ? explode(',', $email['attachment']) : [];
 
+$stmt = $pdo->prepare("SELECT background_image FROM users WHERE id = :id");
+$stmt->execute([':id' => $_SESSION['user_id']]);
+$user_bg = $stmt->fetch(PDO::FETCH_ASSOC);
+
+// Default background image path
+$default_background = 'images/mainbg.jpg'; // Default image if none is set
+$current_background = $user_bg['background_image'] ?: $default_background; // Use user image or default
+
+// Cache busting: Add a timestamp to the image URL to avoid caching
+$background_image_url = $current_background . '?v=' . time();
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
+<meta charset="UTF-8">
+    <link rel="icon" href="images/favicon.ico" type="image/x-icon"> <!-- Adjust path if necessary -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="bootstrap-5.3.3-dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="fontawesome-free-6.6.0-web/css/all.min.css">
+    <script src="bootstrap-5.3.3-dist/js/bootstrap.bundle.min.js"></script>
+
+    <body style="background: url('<?php echo $background_image_url; ?>') no-repeat center center fixed; background-size: cover;">
+
     <title>View Deleted Email - HueMail</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>

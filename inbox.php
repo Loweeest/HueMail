@@ -82,7 +82,12 @@ if (isset($_POST['pin'])) {
     exit;
 }
 
-// If PIN exists, user can proceed to inbox or other sections
+// Pagination logic
+$emails_per_page = 10; // Define how many emails to show per page
+$page = isset($_GET['page']) ? (int)$_GET['page'] : 1; // Current page
+$offset = ($page - 1) * $emails_per_page; // Calculate the offset
+
+// ** Folder Selection **
 $valid_folders = ['inbox', 'unread', 'draft', 'sent', 'archive', 'trash', 'spam', 'starred'];
 $folder = isset($_GET['folder']) ? $_GET['folder'] : 'inbox';
 if (!in_array($folder, $valid_folders)) {
@@ -90,40 +95,45 @@ if (!in_array($folder, $valid_folders)) {
 }
 
 // Fetch emails based on the folder
-if ($folder === 'starred') {
-    // Fetch starred emails
+if ($folder === 'inbox' || $folder === 'unread') {
+    // Fetch emails that are either "inbox" or "unread"
     $stmt = $pdo->prepare('
-        SELECT e.id, e.sender, e.recipient, e.subject, e.body, e.status, e.created_at, u.email AS sender_email
-        FROM emails e
-        JOIN starred_emails s ON e.id = s.email_id
-        JOIN register u ON e.user_id = u.id
-        WHERE s.user_id = ? 
-        ORDER BY e.created_at DESC
+        SELECT id, sender, subject, body, received_at, status, attachment
+        FROM inbox_emails
+        WHERE user_id = :user_id AND status IN ("inbox", "unread")
+        ORDER BY received_at DESC
+        LIMIT :offset, :emails_per_page
     ');
-    $stmt->execute([$user_id]);
-} elseif ($folder === 'unread') {
-    // Fetch unread emails
-    $stmt = $pdo->prepare('
-        SELECT e.id, e.sender, e.recipient, e.subject, e.body, e.status, e.created_at, u.email AS sender_email
-        FROM emails e
-        JOIN register u ON e.user_id = u.id
-        WHERE e.user_id = ? AND e.status = "unread" 
-        ORDER BY e.created_at DESC
-    ');
-    $stmt->execute([$user_id]);
+    $stmt->bindValue(':user_id', $user_id, PDO::PARAM_INT);
+    $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+    $stmt->bindValue(':emails_per_page', $emails_per_page, PDO::PARAM_INT);
+    $stmt->execute();
 } else {
     // Fetch emails for other folders
     $stmt = $pdo->prepare('
-        SELECT e.id, e.sender, e.recipient, e.subject, e.body, e.status, e.created_at, u.email AS sender_email
-        FROM emails e
-        JOIN register u ON e.user_id = u.id
-        WHERE e.user_id = ? AND e.status = ? 
-        ORDER BY e.created_at DESC
+        SELECT id, sender, subject, body, received_at, status, attachment
+        FROM inbox_emails
+        WHERE user_id = :user_id AND status = :status
+        ORDER BY received_at DESC
+        LIMIT :offset, :emails_per_page
     ');
-    $stmt->execute([$user_id, $folder]);
+    $stmt->bindValue(':user_id', $user_id, PDO::PARAM_INT);
+    $stmt->bindValue(':status', $folder, PDO::PARAM_STR);
+    $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+    $stmt->bindValue(':emails_per_page', $emails_per_page, PDO::PARAM_INT);
+    $stmt->execute();
 }
 
 $emails = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch total count of emails for pagination
+$stmt = $pdo->prepare('
+    SELECT COUNT(*) AS total FROM inbox_emails
+    WHERE user_id = :user_id AND status IN ("inbox", "unread")
+');
+$stmt->execute([':user_id' => $user_id]);
+$total_emails = $stmt->fetch(PDO::FETCH_ASSOC)['total'];
+$total_pages = ceil($total_emails / $emails_per_page); // Calculate total pages
 
 // Fetch user's profile picture
 $stmt = $pdo->prepare("SELECT profile_pic FROM register WHERE id = :id");
@@ -133,40 +143,32 @@ $user = $stmt->fetch(PDO::FETCH_ASSOC);
 $default_profile_pic = 'images/pp.png'; // Default profile picture
 $profile_pic_path = $user['profile_pic'] ?: $default_profile_pic;
 
-// Fetch email counts for all folders
-$email_counts = [];
-$count_sql = '
-    SELECT 
-        COUNT(CASE WHEN e.status = "inbox" THEN 1 END) AS inbox,
-        COUNT(CASE WHEN e.status = "unread" THEN 1 END) AS unread,
-        COUNT(CASE WHEN e.status = "draft" THEN 1 END) AS draft,
-        COUNT(CASE WHEN e.status = "sent" THEN 1 END) AS sent,
-        COUNT(CASE WHEN e.status = "archive" THEN 1 END) AS archive,
-        COUNT(CASE WHEN e.status = "spam" THEN 1 END) AS spam,
-        (SELECT COUNT(*) FROM deleted_emails de WHERE de.user_id = e.user_id) AS trash,
-        COUNT(s.email_id) AS starred
-    FROM emails e
-    LEFT JOIN starred_emails s ON e.id = s.email_id
-    WHERE e.user_id = ?
-';
-$stmt = $pdo->prepare($count_sql);
-$stmt->execute([$user_id]);
-$email_counts = $stmt->fetch(PDO::FETCH_ASSOC);
-
 // Search functionality
 $search_query = isset($_GET['search']) ? $_GET['search'] : '';
 if ($search_query) {
     $stmt = $pdo->prepare('
-        SELECT e.id, e.sender, e.recipient, e.subject, e.body, e.status, e.created_at, u.email AS sender_email
-        FROM emails e
-        JOIN register u ON e.user_id = u.id
-        WHERE e.user_id = ? AND (e.subject LIKE ? OR e.sender LIKE ?)
-        ORDER BY e.created_at DESC
+        SELECT id, sender, subject, body, received_at, status, attachment
+        FROM inbox_emails
+        WHERE user_id = :user_id AND (subject LIKE :search_query OR sender LIKE :search_query)
+        ORDER BY received_at DESC
     ');
-    $stmt->execute([$user_id, "%$search_query%", "%$search_query%"]);
+    $stmt->execute([':user_id' => $user_id, ':search_query' => "%$search_query%"]);
     $emails = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
+
+// Fetch user's background image from the 'users' table
+$stmt = $pdo->prepare("SELECT background_image FROM users WHERE id = :id");
+$stmt->execute([':id' => $user_id]);
+$user_bg = $stmt->fetch(PDO::FETCH_ASSOC);
+
+// Default background image path
+$default_background = 'images/mainbg.jpg'; // Default image if none is set
+$current_background = $user_bg['background_image'] ?: $default_background; // Use user image or default
+
+// Cache busting: Add a timestamp to the image URL to avoid caching
+$background_image_url = $current_background . '?v=' . time();
 ?>
+
 
 
 <!DOCTYPE html>
@@ -174,6 +176,8 @@ if ($search_query) {
 
 <head>
     <meta charset="UTF-8">
+    <link rel="icon" href="images/favicon.ico" type="image/x-icon"> <!-- Adjust path if necessary -->
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- Link to Bootstrap CSS (locally) -->
     <link rel="stylesheet" href="bootstrap-5.3.3-dist/css/bootstrap.min.css">
@@ -182,6 +186,9 @@ if ($search_query) {
     <link rel="stylesheet" href="fontawesome-free-6.6.0-web/css/all.min.css">
     
     <title><?php echo ucfirst($folder); ?> - HueMail</title>
+
+    <body style="background: url('<?php echo $background_image_url; ?>') no-repeat center center fixed; background-size: cover;">
+
     <style>
         body {
             font-family: 'Roboto', sans-serif;
@@ -511,48 +518,37 @@ if ($search_query) {
 
             <a href="inbox.php" class="active">
                 <i class="fas fa-inbox"></i> Inbox
-                <span class="folder-count"> <?php echo $email_counts['inbox']; ?></span>
             </a>
 
-            <a href="starred.php" class="<?php echo $folder === 'unread' ? 'active' : ''; ?>">
+            <a href="starred.php" class="<?php echo $folder === 'starred' ? 'active' : ''; ?>">
                 <i class="fas fa-star"></i> Starred
-                <span class="folder-count"> <?php echo $email_counts['starred']; ?></span>
             </a>
 
-            <a href="unread.php" class="<?php echo $folder === 'unread' ? 'active' : ''; ?>">
-                <i class="fas fa-envelope-open-text"></i> Unread
-                <span class="folder-count"> <?php echo $email_counts['unread']; ?></span>
-            </a>
+            <!--  <a href="unread.php" class="<?php echo $folder === 'unread' ? 'active' : ''; ?>">
+             <i class="fas fa-envelope-open-text"></i> Unread 
+            </a> -->
 
             <a href="sent.php" class="<?php echo $folder === 'sent' ? 'active' : ''; ?>">
                 <i class="fas fa-paper-plane"></i> Sent
-                <span class="folder-count"> <?php echo $email_counts['sent']; ?></span>
             </a>
 
             <a href="draft.php" class="<?php echo $folder === 'draft' ? 'active' : ''; ?>">
                 <i class="fas fa-file-alt"></i> Drafts
-                <span class="folder-count"> <?php echo $email_counts['draft']; ?></span>
             </a>
 
             <a href="archive.php" class="<?php echo $folder === 'archive' ? 'active' : ''; ?>">
                 <i class="fas fa-archive"></i> Archive
-                <span class="folder-count"> <?php echo $email_counts['archive']; ?></span>
             </a>
 
             <a href="spam.php" class="<?php echo $folder === 'spam' ? 'active' : ''; ?>">
                 <i class="fas fa-exclamation-triangle"></i> Spam
-                <span class="folder-count"> <?php echo $email_counts['spam']; ?></span>
             </a>
 
             <a href="trash.php" class="<?php echo $folder === 'trash' ? 'active' : ''; ?>">
                 <i class="fas fa-trash"></i> Trash
-                <span class="folder-count"> <?php echo $email_counts['trash']; ?></span>
             </a>
         </div>
 
-        <a href="logout.php" class="logout">
-            <i class="fas fa-sign-out-alt"></i> Logout
-        </a>
     </div>
 
     <div class="main-content">
@@ -570,38 +566,96 @@ if ($search_query) {
                     <a href="add_profile.php">Profile Settings</a>
                     <a href="account_settings.php">Account Settings</a>
                     <a href="change_password.php">Change Password</a>
+                    <a href="background_images.php">Change Background</a>
                     <a href="privacy.php">Privacy Policy</a>
                     <a href="terms.php">Terms of Service</a>
-                    <a href="team.php">Meet The Team!</a>
+                    <a href="team.php">Meet The Team</a>
+                    <a href="logout.php">Logout</a>
                 </div>
             </div>
         </div>
         <table>
-            <thead>
-                <tr>
-                    <th>Actions</th>
-                    <th>Sender</th>
-                    <th>Subject</th>
-                    <th>Date</th>
-                </tr>
-            </thead>
-            <tbody id="email-list">
-                <?php
-                if (count($emails) == 0) {
-                    echo '<tr><td colspan="4" class="no-emails-message">Yay! No emails found.</td></tr>';
-                } else {
-                    foreach ($emails as $email) {
-                        echo '<tr>';
-                        echo '<td><a href="view.php?id=' . $email['id'] . '">View</a></td>';
-                        echo '<td>' . htmlspecialchars($email['sender_email']) . '</td>';
-                        echo '<td class="email-subject">' . htmlspecialchars($email['subject']) . '</td>';
-                        echo '<td>' . htmlspecialchars($email['created_at']) . '</td>';
-                        echo '</tr>';
-                    }
-                }
-                ?>
-            </tbody>
-        </table>
+    <thead>
+        <tr>
+            <th>Actions</th>
+            <th>Sender</th>
+            <th>Subject</th>
+            <th>Date</th>
+        </tr>
+    </thead>
+    <tbody id="email-list">
+        <?php
+        if (count($emails) == 0) {
+            echo '<tr id="no-emails-message" style="display: table-row;"><td colspan="4" class="no-emails-message">Yay! No emails found.</td></tr>';
+        } else {
+            foreach ($emails as $email) {
+                echo '<tr>';
+                echo '<td><a href="view_email.php?id=' . $email['id'] . '">View</a></td>';
+                echo '<td>' . htmlspecialchars($email['sender']) . '</td>';
+                echo '<td class="email-subject">' . htmlspecialchars($email['subject']) . '</td>';
+                echo '<td>' . htmlspecialchars($email['received_at']) . '</td>';
+                echo '</tr>';
+            }
+        }
+        ?>
+    </tbody>
+</table>
+
+        
+    <style> 
+    /* Pagination Styles */
+.pagination {
+    display: flex;
+    justify-content: center; /* Center the pagination links */
+    align-items: center;
+    margin: 20px 0; /* Space above and below the pagination */
+    list-style: none; /* Remove default list styling */
+    padding: 0; /* Remove default padding */
+}
+
+.pagination li {
+    margin: 0 5px; /* Space between pagination links */
+}
+
+.pagination a {
+    display: block;
+    padding: 10px 15px; /* Padding inside the pagination links */
+    border: 1px solid #007bff; /* Border color */
+    border-radius: 5px; /* Rounded corners */
+    text-decoration: none; /* Remove underline */
+    color: #007bff; /* Text color */
+    font-size: 16px; /* Font size */
+    transition: background-color 0.3s, color 0.3s; /* Smooth transition for hover effects */
+}
+
+.pagination a:hover {
+    background-color: #007bff; /* Background color on hover */
+    color: #fff; /* Text color on hover */
+}
+
+.pagination .active a {
+    background-color: #007bff; /* Background color for active page */
+    color: #fff; /* Text color for active page */
+    border-color: #0056b3; /* Border color for active page */
+}
+</style>
+
+    <!-- Pagination controls -->
+    <div class="pagination">
+        <?php
+        if ($page > 1) {
+            echo '<a href="?page=' . ($page - 1) . '" class="prev">Previous</a>';
+        }
+        for ($i = 1; $i <= $total_pages; $i++) {
+            echo '<a href="?page=' . $i . '" class="' . ($i == $page ? 'active' : '') . '">' . $i . '</a>';
+        }
+        if ($page < $total_pages) {
+            echo '<a href="?page=' . ($page + 1) . '" class="next">Next</a>';
+        }
+        ?>
+    </div>
+</div>
+
     </div>
 
 
@@ -613,62 +667,177 @@ if ($search_query) {
         });
     </script>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // WebSocket connection to receive new emails
-            const ws = new WebSocket('ws://localhost:8081/email');
+<style>
+    /* Notification container styling */
+    .notification {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background-color: #28a745; /* Green background for new emails */
+        color: white;
+        padding: 10px 20px;
+        border-radius: 5px;
+        font-size: 16px;
+        z-index: 1000;
+        opacity: 0;
+        transition: opacity 0.3s ease-in-out;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        max-width: 300px;
+    }
 
-            // When WebSocket connection opens
-            ws.onopen = function() {
-                console.log("Connected to WebSocket server.");
-            };
+    .notification.show {
+        opacity: 1; /* Show the notification */
+    }
 
-            // Handle WebSocket errors
-            ws.onerror = function(error) {
-                console.error("WebSocket error:", error);
-            };
+    .notification button.close-btn {
+        background: transparent;
+        border: none;
+        color: white;
+        font-size: 18px;
+        cursor: pointer;
+        margin-left: 10px;
+    }
 
-            // When a new email is received via WebSocket
-            ws.onmessage = function(event) {
-                try {
-                    const data = JSON.parse(event.data);
-                    console.log('Received data:', data);
+    .notification button.close-btn:hover {
+        color: #ddd; /* Lighten the color when hovered */
+    }
 
-                    if (data.type === 'new_email') {
-                        const newEmail = data.message;
-                        console.log('New email:', newEmail);
+    /* Optional: You can change the background color for different types of notifications */
+    .notification.new-email {
+        background-color: #28a745; /* Green for new emails */
+    }
 
-                        // Check that necessary data is available
-                        if (!newEmail || !newEmail.id || !newEmail.subject || !newEmail.sender_email || !newEmail.created_at) {
-                            console.error('Email data is missing expected fields:', newEmail);
-                            return;
-                        }
+    /* Bold styling for new emails */
+    .new-email-row {
+        font-weight: bold;
+        background-color: #f0f8ff; /* Light background to highlight new emails */
+    }
+</style>
 
-                        // Format date for displaying
-                        const createdAt = new Date(newEmail.created_at).toLocaleString();
 
-                        // Create a new row for the email
-                        const emailList = document.getElementById('email-list');
-                        const newRow = document.createElement('tr');
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+    // WebSocket connection to receive new emails
+    const ws = new WebSocket('ws://localhost:8081/email');
 
-                        // Insert email data into the row
-                        newRow.innerHTML = `
-                    <td><a href="view.php?id=${newEmail.id}">View</a></td>
+    // WebSocket open event: When the connection is established
+    ws.onopen = function() {
+        console.log("Connected to WebSocket server.");
+    };
+
+    // WebSocket error event: Handle errors
+    ws.onerror = function(error) {
+        console.error("WebSocket error:", error);
+    };
+
+    // WebSocket close event: Handle disconnections and attempt to reconnect
+    ws.onclose = function(event) {
+        console.log("WebSocket closed:", event);
+        setTimeout(() => {
+            console.log("Reconnecting to WebSocket...");
+            reconnectWebSocket();
+        }, 5000); // Try to reconnect after 5 seconds
+    };
+
+    // When a new email is received via WebSocket
+    ws.onmessage = function(event) {
+        try {
+            const data = JSON.parse(event.data); // Parse the incoming JSON data
+            console.log('Received data:', data);
+
+            // Check if the message is of type 'new_email'
+            if (data.type === 'new_email') {
+                const newEmail = data.message; // Extract the email message
+                console.log('New email object:', newEmail);
+
+                // Check if the necessary fields exist in the new email object
+                if (!newEmail || !newEmail.id) {
+                    console.error('Error: New email data is missing ID. Full email data:', newEmail);
+                    return; // If no ID, exit the function
+                }
+
+                // Ensure all necessary fields are present
+                if (!newEmail.subject || !newEmail.sender_email || !newEmail.created_at) {
+                    console.error('Error: Missing expected fields for the email:', newEmail);
+                    return; // If any expected field is missing, exit the function
+                }
+
+                // Format the created_at timestamp to a readable format
+                const createdAt = new Date(newEmail.created_at).toLocaleString();
+
+                // Create a new row to display the email in the list
+                const emailList = document.getElementById('email-list');
+                const newRow = document.createElement('tr');
+
+                // Add a class to the row to highlight new emails
+                newRow.classList.add('new-email-row');
+
+                // Populate the new row with email details
+                newRow.innerHTML = `
+                    <td><a href="view_email.php?id=${newEmail.id}">View</a></td>
                     <td>${newEmail.sender_email}</td>
                     <td class="email-subject">${newEmail.subject}</td>
                     <td>${createdAt}</td>
                 `;
 
-                        // Insert the new row at the top of the email list (newest first)
-                        emailList.insertBefore(newRow, emailList.firstChild);
+                // Insert the new row at the top of the email list (newest emails first)
+                emailList.insertBefore(newRow, emailList.firstChild);
 
-                    }
-                } catch (error) {
-                    console.error('Error parsing WebSocket message:', error);
+                // If the "no emails found" message exists, hide it
+                const noEmailsMessage = document.getElementById('no-emails-message');
+                if (noEmailsMessage) {
+                    noEmailsMessage.style.display = 'none';
                 }
-            };
-        });
-    </script>
+
+                // Show the notification about the new email
+                showNewEmailNotification(newEmail);
+            }
+        } catch (error) {
+            // Log any errors that occur while parsing the WebSocket message
+            console.error('Error parsing WebSocket message:', error);
+        }
+    };
+
+    // Function to show the notification about a new email
+    function showNewEmailNotification(email) {
+        // Create the notification element
+        const notification = document.createElement('div');
+        notification.classList.add('notification', 'show', 'new-email');
+        notification.innerHTML = `
+            New email from ${email.sender_email}
+            <button class="close-btn">&times;</button>
+        `;
+
+        // Add the notification to the document body
+        document.body.appendChild(notification);
+
+        // Close button functionality
+        const closeButton = notification.querySelector('.close-btn');
+        closeButton.onclick = function() {
+            // Remove the notification when the close button is clicked
+            notification.classList.remove('show');
+            setTimeout(() => notification.remove(), 300); // Smooth removal after fade-out
+        };
+
+        // Automatically remove notification after 5 seconds
+        setTimeout(() => {
+            notification.classList.remove('show');
+            setTimeout(() => notification.remove(), 300); // Smooth removal after fade-out
+        }, 5000); // Notification disappears after 5 seconds
+    }
+
+    // Function to reconnect to WebSocket if the connection is lost
+    function reconnectWebSocket() {
+        const ws = new WebSocket('ws://localhost:8081/email');
+    }
+
+});
+</script>
+
+
     <style>
       /* Basic Modal Styling */
 .modal {

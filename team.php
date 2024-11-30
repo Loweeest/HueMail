@@ -41,13 +41,38 @@ if (!$pin_row) {
     header('Location: create_pin.php');
     exit;
 }
+
+// Fetch user's background image from the 'users' table
+$stmt = $pdo->prepare("SELECT background_image FROM users WHERE id = :id");
+$stmt->execute([':id' => $user_id]);
+$user_bg = $stmt->fetch(PDO::FETCH_ASSOC);
+
+// Default background image path
+$default_background = 'images/mainbg.jpg'; // Default image if none is set
+$current_background = $user_bg['background_image'] ?: $default_background; // Use user image or default
+
+// Cache busting: Add a timestamp to the image URL to avoid caching
+$background_image_url = $current_background . '?v=' . time();
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8">
+    <link rel="icon" href="images/favicon.ico" type="image/x-icon"> <!-- Adjust path if necessary -->
+
+    <!-- Link to Bootstrap CSS (locally) -->
+    <link rel="stylesheet" href="bootstrap-5.3.3-dist/css/bootstrap.min.css">
+    
+    <!-- Link to Font Awesome CSS (locally) -->
+    <link rel="stylesheet" href="fontawesome-free-6.6.0-web/css/all.min.css">
+
+ <!-- Link to Bootstrap JS (locally) -->
+    <script src="bootstrap-5.3.3-dist/js/bootstrap.bundle.min.js"></script>    
+
+    <body style="background: url('<?php echo $background_image_url; ?>') no-repeat center center fixed; background-size: cover;">
+
+
     <title>Team Members</title>
     <style>
         body {
@@ -67,9 +92,13 @@ if (!$pin_row) {
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
             padding: 20px;
             margin: 39px;
+            width: auto; /* Allows the width to adjust to the content */
             text-align: center;
-            margin-top: 6em;
-              overflow: hidden;
+            position: relative;
+            margin-top: auto;
+
+            margin: auto; /* Center the container */
+    overflow: hidden;
         }
         h1 {
             margin-bottom: 20px;
@@ -132,11 +161,11 @@ if (!$pin_row) {
         <div class="members">
             <div class="member">
                 <h2>Member 1: Edig, John Louise G.</h2>
-                <p>Front End.</p>
+                <p>Front End Developer.</p>
             </div>
             <div class="member">
                 <h2>Member 2: Entera, Michael Angelo E.</h2>
-                <p>Front End/Back End.</p>
+                <p>Lead Developer.</p>
             </div>
             <div class="member">
                 <h2>Member 3: Bayubay, Christian Jay</h2>
@@ -144,7 +173,7 @@ if (!$pin_row) {
             </div>
             <div class="member">
                 <h2>Member 4: Acosta, Alije</h2>
-                <p>Documentation.</p>
+                <p>Back End Developer.</p>
             </div>
             <div class="member">
                 <h2>Member 5: Duran, Mitch</h2>
@@ -155,11 +184,11 @@ if (!$pin_row) {
                 <p>Documentation.</p>
             </div>
             <div class="member">
-                <h2>Member 7: Veral, Kirk Arby</h2>
-                <p>Documentation.</p>
+                <h2>Member 7: Sestual, Jefred</h2>
+                <p>Flowchart.</p>
             </div>
             <div class="member">
-                <h2>Member 8: Sestual, Jefred</h2>
+                <h2>Member 8: Veral, Kirk Arby</h2>
                 <p>Documentation.</p>
             </div>
         </div>

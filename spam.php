@@ -31,6 +31,23 @@ try {
     die("Database connection failed: " . $e->getMessage());
 }
 
+// ** Mark email as spam when clicked from the sent emails view **
+if (isset($_GET['id'])) {
+    $email_id = (int)$_GET['id'];
+
+    // Ensure the email belongs to the logged-in user and is not already marked as spam
+    $stmt = $pdo->prepare('
+        UPDATE emails
+        SET status = "spam"
+        WHERE id = :id AND user_id = :user_id AND status = "sent"
+    ');
+    $stmt->execute([':id' => $email_id, ':user_id' => $user_id]);
+
+    // Redirect to the spam folder page after marking the email as spam
+    header('Location: spam.php');
+    exit;
+}
+
 // ** Check if the user has a PIN set **
 $stmt = $pdo->prepare('SELECT * FROM user_pins WHERE user_id = ?');
 $stmt->execute([$user_id]);
@@ -92,32 +109,27 @@ $user = $stmt->fetch(PDO::FETCH_ASSOC);
 $default_profile_pic = 'images/pp.png'; // Ensure this matches the default in add_profile.php
 $profile_pic_path = $user['profile_pic'] ?: $default_profile_pic;
 
-// Fetch email counts for all folders
-$email_counts = [];
-$count_sql = '
-    SELECT 
-        COUNT(CASE WHEN e.status = "inbox" THEN 1 END) AS inbox,
-        COUNT(CASE WHEN e.status = "unread" THEN 1 END) AS unread,
-        COUNT(CASE WHEN e.status = "draft" THEN 1 END) AS draft,
-        COUNT(CASE WHEN e.status = "sent" THEN 1 END) AS sent,
-        COUNT(CASE WHEN e.status = "archive" THEN 1 END) AS archive,
-        COUNT(CASE WHEN e.status = "spam" THEN 1 END) AS spam,
-        (SELECT COUNT(*) FROM deleted_emails de WHERE de.user_id = e.user_id) AS trash,
-        COUNT(s.email_id) AS starred
-    FROM emails e
-    LEFT JOIN starred_emails s ON e.id = s.email_id
-    WHERE e.user_id = ?
-';
-$stmt = $pdo->prepare($count_sql);
-$stmt->execute([$user_id]);
-$email_counts = $stmt->fetch(PDO::FETCH_ASSOC);
+// Fetch user's background image from the 'users' table
+$stmt = $pdo->prepare("SELECT background_image FROM users WHERE id = :id");
+$stmt->execute([':id' => $user_id]);
+$user_bg = $stmt->fetch(PDO::FETCH_ASSOC);
+
+// Default background image path
+$default_background = 'images/mainbg.jpg'; // Default image if none is set
+$current_background = $user_bg['background_image'] ?: $default_background; // Use user image or default
+
+// Cache busting: Add a timestamp to the image URL to avoid caching
+$background_image_url = $current_background . '?v=' . time();
 ?>
+
 
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <link rel="icon" href="images/favicon.ico" type="image/x-icon"> <!-- Adjust path if necessary -->
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- Link to Bootstrap CSS (locally) -->
     <link rel="stylesheet" href="bootstrap-5.3.3-dist/css/bootstrap.min.css">
@@ -127,6 +139,9 @@ $email_counts = $stmt->fetch(PDO::FETCH_ASSOC);
 
  <!-- Link to Bootstrap JS (locally) -->
     <script src="bootstrap-5.3.3-dist/js/bootstrap.bundle.min.js"></script>
+
+    <body style="background: url('<?php echo $background_image_url; ?>') no-repeat center center fixed; background-size: cover;">
+
     <title><?php echo ucfirst($folder); ?> - HueMail</title>
     <style>
 
@@ -428,48 +443,37 @@ a:hover .folder-count {
 
         <a href="inbox.php" class="<?php echo $folder === 'inbox' ? 'active' : ''; ?>">
         <i class="fas fa-inbox"></i> Inbox
-        <span class="folder-count"> <?php echo $email_counts['inbox']; ?></span>
         </a>
 
         <a href="starred.php" class="<?php echo $folder === 'starred' ? 'active' : ''; ?>">
         <i class="fas fa-star"></i> Starred
-        <span class="folder-count"> <?php echo $email_counts['starred']; ?></span>
         </a>
 
-        <a href="unread.php" class="<?php echo $folder === 'unread' ? 'active' : ''; ?>">
-            <i class="fas fa-envelope-open-text"></i> Unread
-            <span class="folder-count"> <?php echo $email_counts['unread']; ?></span>
-        </a>
+      <!--  <a href="unread.php" class="<?php echo $folder === 'unread' ? 'active' : ''; ?>">
+             <i class="fas fa-envelope-open-text"></i> Unread 
+            </a> -->
 
         <a href="sent.php" class="<?php echo $folder === 'sent' ? 'active' : ''; ?>">
             <i class="fas fa-paper-plane"></i> Sent
-            <span class="folder-count"> <?php echo $email_counts['sent']; ?></span>
         </a>
 
         <a href="draft.php" class="<?php echo $folder === 'trash' ? 'active' : ''; ?>">
             <i class="fas fa-file-alt"></i> Drafts
-            <span class="folder-count"> <?php echo $email_counts['draft']; ?></span>
         </a>
 
         <a href="archive.php" class="<?php echo $folder === 'archive' ? 'active' : ''; ?>">
             <i class="fas fa-archive"></i> Archive
-            <span class="folder-count"> <?php echo $email_counts['archive']; ?></span>
         </a>
 
         <a href="spam.php" class="active">
             <i class="fas fa-exclamation-triangle"></i> Spam
-            <span class="folder-count"> <?php echo $email_counts['spam']; ?></span>
         </a>
 
         <a href="trash.php" class="<?php echo $folder === 'trash' ? 'active' : ''; ?>">
             <i class="fas fa-trash"></i> Trash
-            <span class="folder-count"> <?php echo $email_counts['trash']; ?></span>
         </a>
     </div>
 
-    <a href="logout.php" class="logout">
-        <i class="fas fa-sign-out-alt"></i> Logout
-    </a>
 </div>
 
     <div class="main-content">
@@ -482,12 +486,15 @@ a:hover .folder-count {
         <div class="profile">
             <img src="<?php echo htmlspecialchars($profile_pic_path); ?>" alt="Profile Picture">
             <div class="dropdown-menu" id="dropdown-menu">
-                <a href="add_profile.php">Profile Settings</a>
-                <a href="account_settings.php">Account Settings</a>
-                <a href="change_password.php">Change Password</a>
-                <a href="privacy.php">Privacy Policy</a>
-                <a href="terms.php">Terms of Service</a>
-                <a href="team.php">Meet The Team!</a>
+            <a href="add_profile.php">Profile Settings</a>
+                    <a href="account_settings.php">Account Settings</a>
+                    <a href="change_password.php">Change Password</a>
+                    <a href="background_images.php">Change Background</a>
+                    <a href="privacy.php">Privacy Policy</a>
+                    <a href="terms.php">Terms of Service</a>
+                    <a href="team.php">Meet The Team</a>
+                    <a href="logout.php">Logout</a>
+
             </div>
         </div>
     </div>
@@ -508,7 +515,7 @@ a:hover .folder-count {
                 } else {
                     foreach ($emails as $email) {
                         echo '<tr>';
-                        echo '<td><a href="view.php?id=' . $email['id'] . '">View</a></td>';
+                        echo '<td><a href="view_spam.php?id=' . $email['id'] . '">View</a></td>';
                         echo '<td>' . htmlspecialchars($email['sender']) . '</td>';
                         echo '<td class="email-subject">' . htmlspecialchars($email['subject']) . '</td>';
                         echo '<td>' . htmlspecialchars($email['created_at']) . '</td>';
@@ -518,6 +525,44 @@ a:hover .folder-count {
                 ?>
             </tbody>
         </table>
+
+        <style> 
+    /* Pagination Styles */
+.pagination {
+    display: flex;
+    justify-content: center; /* Center the pagination links */
+    align-items: center;
+    margin: 20px 0; /* Space above and below the pagination */
+    list-style: none; /* Remove default list styling */
+    padding: 0; /* Remove default padding */
+}
+
+.pagination li {
+    margin: 0 5px; /* Space between pagination links */
+}
+
+.pagination a {
+    display: block;
+    padding: 10px 15px; /* Padding inside the pagination links */
+    border: 1px solid #007bff; /* Border color */
+    border-radius: 5px; /* Rounded corners */
+    text-decoration: none; /* Remove underline */
+    color: #007bff; /* Text color */
+    font-size: 16px; /* Font size */
+    transition: background-color 0.3s, color 0.3s; /* Smooth transition for hover effects */
+}
+
+.pagination a:hover {
+    background-color: #007bff; /* Background color on hover */
+    color: #fff; /* Text color on hover */
+}
+
+.pagination .active a {
+    background-color: #007bff; /* Background color for active page */
+    color: #fff; /* Text color for active page */
+    border-color: #0056b3; /* Border color for active page */
+}
+</style>
 
         <!-- Pagination -->
         <div class="pagination">

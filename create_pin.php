@@ -41,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Set success message to display on the page
         $_SESSION['pin_success_message'] = 'Your PIN has been successfully created!';
 
-        // Mark that the PIN has been created (this is what you're checking in inbox.php)
+        // Mark that the PIN has been created (this is what you're checking in logout.php)
         $_SESSION['pin_created'] = true;
 
         // No redirect, just stay on the page
@@ -53,13 +53,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <link rel="icon" href="images/favicon.ico" type="image/x-icon"> <!-- Adjust path if necessary -->
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
     <title>Create PIN</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: url('images/pp.jpg') no-repeat center center fixed;
+            background: url('images/mainbg.jpg') no-repeat center center fixed;
             background-size: cover;
             margin: 0;
             display: flex;
@@ -119,7 +121,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         button {
-            width: 100%;
+            width: 50%;
             padding: 12px;
             background-color: #1877f2;
             color: #fff;
@@ -173,6 +175,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         .modal-button {
+            width: 25%;
             background-color: #1877f2;
             color: #fff;
             border: none;
@@ -221,7 +224,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <!-- Informational Note -->
         <p class="note">
-            <strong>Note:</strong> If this is your first time logging in, you must set up a PIN. Please make sure to remember your PIN, as it will be required for future logins.
+            <strong>Note:</strong> To ensure your account is secure, please create a PIN as this is your first time logging in. <strong>Please make sure to remember your PIN, as it will be required for future logins</strong>.
         </p>
     </div>
 
@@ -230,9 +233,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Your PIN has been successfully created!</h2>
+                <p>NOTE: After setting your PIN, <italic>you will be logged out for security purposes</italic>.</p>
             </div>
             <div class="modal-footer">
-                <button class="modal-button" onclick="closeModalAndProceed()">Proceed to Inbox</button>
+                <button class="modal-button" onclick="closeModalAndProceed()">Okay</button>
             </div>
         </div>
     </div>
@@ -275,8 +279,8 @@ document.getElementById('pin_digit_1').focus();
         function closeModalAndProceed() {
             // Hide modal
             document.getElementById('successModal').style.display = 'none';
-            // Redirect to inbox.php
-            window.location.href = 'inbox.php';
+            // Redirect to logout.php
+            window.location.href = 'logout.php';
         }
     </script>
 </body>

@@ -7,6 +7,8 @@ include 'navbar.php'; // Include the navbar
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <link rel="icon" href="images/favicon.ico" type="image/x-icon"> <!-- Adjust path if necessary -->
+
     <!-- Link to Bootstrap CSS (locally) -->
     <link rel="stylesheet" href="bootstrap-5.3.3-dist/css/bootstrap.min.css">
     
@@ -18,7 +20,7 @@ include 'navbar.php'; // Include the navbar
     <style>
   body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: url('images/pp.jpg') no-repeat center center fixed;
+            background: url('images/mainbg.jpg') no-repeat center center fixed;
             background-size: cover;
             margin: 0;
             display: flex;

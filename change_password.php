@@ -92,12 +92,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 }
+
+// Fetch user's background image from the 'users' table
+$stmt = $pdo->prepare("SELECT background_image FROM users WHERE id = :id");
+$stmt->execute([':id' => $user_id]);
+$user_bg = $stmt->fetch(PDO::FETCH_ASSOC);
+
+// Default background image path
+$default_background = 'images/mainbg.jpg'; // Default image if none is set
+$current_background = $user_bg['background_image'] ?: $default_background; // Use user image or default
+
+// Cache busting: Add a timestamp to the image URL to avoid caching
+$background_image_url = $current_background . '?v=' . time();
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <link rel="icon" href="images/favicon.ico" type="image/x-icon"> <!-- Adjust path if necessary -->
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Change Password</title>
     <!-- Link to Bootstrap CSS (locally) -->
@@ -109,7 +123,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
      <!-- Link to Bootstrap JS (locally) -->
      <script src="bootstrap-5.3.3-dist/js/bootstrap.bundle.min.js"></script>
 
-     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+
+     <body style="background: url('<?php echo $background_image_url; ?>') no-repeat center center fixed; background-size: cover;">
 
     </body>
 

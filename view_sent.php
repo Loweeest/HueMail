@@ -56,13 +56,32 @@ function formatFileSize($size) {
         return $size . ' bytes';
     }
 }
+
+$stmt = $pdo->prepare("SELECT background_image FROM users WHERE id = :id");
+$stmt->execute([':id' => $_SESSION['user_id']]);
+$user_bg = $stmt->fetch(PDO::FETCH_ASSOC);
+
+// Default background image path
+$default_background = 'images/mainbg.jpg'; // Default image if none is set
+$current_background = $user_bg['background_image'] ?: $default_background; // Use user image or default
+
+// Cache busting: Add a timestamp to the image URL to avoid caching
+$background_image_url = $current_background . '?v=' . time();
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
+<meta charset="UTF-8">
+    <link rel="icon" href="images/favicon.ico" type="image/x-icon"> <!-- Adjust path if necessary -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="bootstrap-5.3.3-dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="fontawesome-free-6.6.0-web/css/all.min.css">
+    <script src="bootstrap-5.3.3-dist/js/bootstrap.bundle.min.js"></script>
+
+    <body style="background: url('<?php echo $background_image_url; ?>') no-repeat center center fixed; background-size: cover;">
+
+    
     <title>View Sent Email - HueMail</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
@@ -367,10 +386,19 @@ function formatFileSize($size) {
 <body>
 
 <div class="email-container">
-    <div class="email-header">
-        <h2>Sent Email</h2>
-        <a href="sent.php" class="back-button"><i class="fas fa-arrow-left"></i>Back to Sent</a>
+<div class="email-header">
+    <h2>Sent Email</h2>
+    <div style="display: flex; align-items: center;">
+    <a href="starred.php?id=<?= $email_id ?>" class="star-button" style="margin-right: 20px;">
+    <i class="fas fa-star"></i> <!-- Star Icon -->
+</a>
+        </a>
+        <a href="sent.php" class="back-button">
+            <i class="fas fa-arrow-left"></i>Back to Sent
+        </a>
     </div>
+</div>
+
 
     <div class="email-details">
         <div class="recipient"><strong>To:</strong> <?= htmlspecialchars($email['recipient']) ?></div>
@@ -404,7 +432,7 @@ function formatFileSize($size) {
 
 
     <a href="archive.php?id=<?= $email_id ?>" class="archive-btn"><i class="fas fa-archive"></i> Archive</a>
-<a href="spam.php?id=<?= $email_id ?>" class="spam-btn"><i class="fas fa-ban"></i> Spam</a>
+    <a href="spam.php?id=<?= $email_id ?>" class="spam-btn"><i class="fas fa-ban"></i> Spam</a>
     <!-- Delete Button that triggers Modal -->
     <a href="#" class="delete-button" onclick="showModal(<?= $email_id ?>)"><i class="fas fa-trash"></i> Move to Trash</a>
 </div>

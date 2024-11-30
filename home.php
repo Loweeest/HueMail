@@ -38,6 +38,9 @@ $cookie_consent = isset($_COOKIE['cookie_consent']) ? $_COOKIE['cookie_consent']
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+
+    <link rel="icon" href="images/favicon.ico" type="image/x-icon"> <!-- Adjust path if necessary -->
+
     <!-- Link to Bootstrap CSS (locally) -->
     <link rel="stylesheet" href="bootstrap-5.3.3-dist/css/bootstrap.min.css">
     
@@ -81,14 +84,19 @@ $cookie_consent = isset($_COOKIE['cookie_consent']) ? $_COOKIE['cookie_consent']
             background-color: #555; /* Darker background on hover and for the current page */
         }
         .container {
-            background: rgba(255, 255, 255, 0.9); /* Semi-transparent white background */
-            border-radius: 12px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-            padding: 20px;
-            margin: 39px;
-            width: auto; /* Allows the width to adjust to the content */
-            text-align: center;
-        }
+    background: rgba(255, 255, 255, 0.9); /* Semi-transparent white background */
+    border: 5px solid white; /* Light gray border */
+    border-radius: 30px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    padding: 25px;
+    max-width: 60rem; /* Adjust width as needed */
+    width: 90%;
+    text-align: center;
+    margin: auto; /* Center the container */
+    position: relative;
+    margin-top: auto;
+    overflow: hidden;
+}
         h1 {
             margin-bottom: 20px;
             color: #333;
@@ -191,8 +199,7 @@ $cookie_consent = isset($_COOKIE['cookie_consent']) ? $_COOKIE['cookie_consent']
 <body>
     <div class="navbar">
         <div class="nav-links">
-        <a href="home.php" class="<?php echo $page == 'home' ? 'current' : ''; ?>">
-        <img src="images/textlogo.png" alt="Home" width="200" height="50"></a>
+            <a href="home.php" class="<?php echo $page == 'home' ? 'current' : ''; ?>">Home</a>
                         </div>
         <div class="auth-links">
     <a href="login.php" class="<?php echo $page == 'login' ? 'current' : ''; ?>">Log In</a>
